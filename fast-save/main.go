@@ -26,12 +26,21 @@ func main() {
 		os.Exit(1)
 	}(r)
 
+	count := 0
+	timer := time.NewTicker(1 * time.Second)
+	go func() {
+		for {
+			<-timer.C
+			log.Print(count)
+		}
+	}()
 	for {
-		m, err := r.ReadMessage(context.Background())
+		_, err := r.ReadMessage(context.Background())
 		if err != nil {
 			break
 		}
-		log.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
+		count++
+		//log.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
 	}
 
 }

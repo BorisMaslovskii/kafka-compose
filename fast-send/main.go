@@ -20,7 +20,7 @@ func main() {
 		Topic:        "fast",
 		Balancer:     &kafka.LeastBytes{},
 		BatchTimeout: 500 * time.Millisecond,
-		BatchSize:    10000,
+		BatchSize:    20000,
 	}
 
 	c := make(chan os.Signal, 1)
@@ -34,7 +34,7 @@ func main() {
 	startTime := time.Now()
 	wg := sync.WaitGroup{}
 	messages := make([]kafka.Message, 0, 10000)
-	for i := 1; i <= 10000; i++ {
+	for i := 1; i <= 20000; i++ {
 		messages = append(messages,
 			kafka.Message{
 				Key:   []byte(fmt.Sprint(i)),
