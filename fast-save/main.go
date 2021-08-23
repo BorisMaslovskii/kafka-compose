@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -13,14 +12,18 @@ import (
 )
 
 func main() {
-
-	// urlExample := "postgres://username:password@localhost:5432/database_name"
-	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	urlExample := "postgres://postgres:pgpass@localhost:5432?search_path=kafka"
+	conn, err := pgx.Connect(context.Background(), urlExample)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		log.Print("Unable to connect to database: ", err)
 		os.Exit(1)
 	}
-	defer conn.Close(context.Background())
+	defer func(conn *pgx.Conn, ctx context.Context) {
+		err := conn.Close(ctx)
+		if err != nil {
+			log.Print("can't close db connection")
+		}
+	}(conn, context.Background())
 
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        []string{"localhost:9092"},
@@ -37,28 +40,44 @@ func main() {
 		os.Exit(1)
 	}(r)
 
-	count := 0
+	batch := &pgx.Batch{}
+
+	//count := 0
 	timer := time.NewTicker(1 * time.Second)
 	go func() {
 		for {
 			<-timer.C
-			log.Print(count)
+			//log.Print(count)
+
+			br := conn.SendBatch(context.Background(), batch)
+			err := br.Close()
+			if err != nil {
+				os.Exit(1)
+			}
+			batch = &pgx.Batch{}
+
+			var rowsCount int64
+			err = conn.QueryRow(context.Background(), "select count(*) from messages").Scan(&rowsCount)
+			if err != nil {
+				log.Printf("QueryRow failed: %v\n", err)
+				os.Exit(1)
+			}
+			log.Print("table count: ", rowsCount)
 		}
 	}()
+
 	for {
-		_, err := r.ReadMessage(context.Background())
+		message, err := r.ReadMessage(context.Background())
 		if err != nil {
 			break
 		}
-		count++
-		//log.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
+
+		batch.Queue("insert into messages(i, message) values($1, $2)", string(message.Key), string(message.Value))
 	}
 
 }
 
 func cleanup(r *kafka.Reader) {
-	log.Println("writer closed")
-
 	if err := r.Close(); err != nil {
 		log.Fatal("failed to close reader:", err)
 	}

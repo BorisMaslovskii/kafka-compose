@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
 
 	kafka "github.com/segmentio/kafka-go"
@@ -20,7 +19,7 @@ func main() {
 		Topic:        "fast",
 		Balancer:     &kafka.LeastBytes{},
 		BatchTimeout: 500 * time.Millisecond,
-		BatchSize:    20000,
+		BatchSize:    10000,
 	}
 
 	c := make(chan os.Signal, 1)
@@ -31,25 +30,27 @@ func main() {
 		os.Exit(1)
 	}(w)
 
-	startTime := time.Now()
-	wg := sync.WaitGroup{}
-	messages := make([]kafka.Message, 0, 10000)
-	for i := 1; i <= 20000; i++ {
-		messages = append(messages,
-			kafka.Message{
-				Key:   []byte(fmt.Sprint(i)),
-				Value: []byte("FastTest"),
-			},
-		)
+	timer := time.NewTicker(1 * time.Second)
+	for {
+		<-timer.C
+		startTime := time.Now()
+		messages := make([]kafka.Message, 0, 10000)
+		for i := 1; i <= 10000; i++ {
+			messages = append(messages,
+				kafka.Message{
+					Key:   []byte(fmt.Sprint(i)),
+					Value: []byte("FastTest"),
+				},
+			)
+		}
+		log.Print(time.Since(startTime))
+		log.Print(len(messages))
+		err := w.WriteMessages(context.Background(), messages...)
+		if err != nil {
+			log.Print("failed to write messages:", err)
+		}
+		log.Print(time.Since(startTime))
 	}
-	wg.Wait()
-	log.Print(time.Since(startTime))
-	log.Print(len(messages))
-	err := w.WriteMessages(context.Background(), messages...)
-	if err != nil {
-		log.Print("failed to write messages:", err)
-	}
-	log.Print(time.Since(startTime))
 
 }
 
