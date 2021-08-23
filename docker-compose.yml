@@ -12,6 +12,7 @@ services:
     environment:
       DOCKER_API_VERSION: 1.22
       KAFKA_ADVERTISED_HOST_NAME: 192.168.0.120
+      // test comment
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_CREATE_TOPICS: "ping:1:1,pong:1:1,fast:1:1"
     volumes:
